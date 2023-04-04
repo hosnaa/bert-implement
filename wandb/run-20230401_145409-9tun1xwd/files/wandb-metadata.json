@@ -1,0 +1,49 @@
+{
+    "os": "Linux-5.4.0-1102-gcp-x86_64-with-glibc2.27",
+    "python": "3.9.16",
+    "heartbeatAt": "2023-04-01T14:54:09.655075",
+    "startedAt": "2023-04-01T14:54:09.346411",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/home/hosna/hosna_study/main.py",
+    "codePath": "main.py",
+    "host": "codon-optimization",
+    "username": "hosna",
+    "executable": "/home/walid/miniconda3/envs/study2/bin/python3",
+    "cpu_count": 2,
+    "cpu_count_logical": 2,
+    "cpu_freq": {
+        "current": 2299.998,
+        "min": 0.0,
+        "max": 0.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2299.998,
+            "min": 0.0,
+            "max": 0.0
+        },
+        {
+            "current": 2299.998,
+            "min": 0.0,
+            "max": 0.0
+        }
+    ],
+    "disk": {
+        "total": 193.6498260498047,
+        "used": 175.7031021118164
+    },
+    "gpu": "Tesla T4",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "Tesla T4",
+            "memory_total": 15843721216
+        }
+    ],
+    "memory": {
+        "total": 14.646892547607422
+    }
+}
