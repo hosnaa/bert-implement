@@ -15,12 +15,11 @@ from src.relative_position import RelativePositionalEmbedding
 # (2) Position: for each word position, (3) segment: for each word, what sentence it belongs to
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# Question: Is this a correct integration? or we should have made it more separated; as we added more arguments not relevant to embeddings
 class SinCosPositionalEncoding(nn.Module):
     def __init__(self, emb_size: int, maxlen: int, dropout: int, device):
         super(SinCosPositionalEncoding, self).__init__()
         den = torch.exp(- torch.arange(0,emb_size, 2) * math.log(10000) /emb_size)
-        pos = torch.arange(0,maxlen).reshape(maxlen, 1) # Question: how to make max_en that from batch?
+        pos = torch.arange(0,maxlen).reshape(maxlen, 1) 
         self.pos_emb = torch.zeros((maxlen,emb_size))
         self.pos_emb[:, 0::2] = torch.sin(pos * den) # this needs to be both of same size; emb_size needs to be even
         self.pos_emb[:, 1::2] = torch.cos(pos * den)
@@ -51,30 +50,23 @@ class BERTEmbedding(nn.Module):
             pos_emb = self.relative_pos_emb(tok_emb, tok_emb, tok_emb, atten_mask)
 
         elif self.pos_emb == 'attn': 
-            pos_emb_tensor = torch.arange(sentence_size, dtype=torch.long).to(self.device) # We want tensor by sentence size, Q: wouldn't this always be the optimal length? => yes
-            pos_emb_tensor = pos_emb_tensor.expand_as(x) # to make them same sizes for broadcast of addition; naiive Q: we don't broadcast tok_emb but others?
+            pos_emb_tensor = torch.arange(sentence_size, dtype=torch.long).to(self.device) # We want tensor by sentence size
+            pos_emb_tensor = pos_emb_tensor.expand_as(x) # to make them same sizes for broadcast of addition
             pos_emb = self.attn_pos_emb(tok_emb)
         
         elif self.pos_emb == 'sin':
             pos_emb = self.sin_pos_encoding(seq_len=sentence_size) # BUG: this is has no batch info, is this expected? given it's indep of seq and only needs its length?
 
         # Note that the input is composed of 2 sentences. (we prepared the data this way)
-        # Solved Question: how do we know that exactly the 2nd part of input belongs to the 2nd sentence => we already padded the seqs so they have same len + always odd (due to sep)
-        # Solved Question: why do we make this as an embedding? what do we need to learn here if the objective is to assign this and that to separate sentences (before and after [SEP]) => not all imp make it; can be instead by learning [SEP]
         seg_emb_tensor = torch.zeros(x.size()).to(device) # to make a tensor that will be then filled by 0/1 denoting sentences
         seg_emb_tensor[:, sentence_size // 2 + 1:] = 1 # we know half of sentence means one sentence as we made all sentences of one common size
-        # Question: when integrated, does this mean pos_emb alone has its own attention? 
-        # Question: how to make it applicable to have different positional embeddings? 
         total_input_emb =  tok_emb + self.segment_emb(seg_emb_tensor.long()) + pos_emb # + 
         # shape: batch_size, seq_len, emb_dim
         return total_input_emb
-"""
-Stop here; check the `Attention` module from `hits_generation` repo to be benchmark
-"""   
-## Q: difference between the multihead we made before (probably has sth missing) and this one. [Concatenates not just reshapethen shrink]
+
 class SelfAttention(nn.Module):
     def __init__(self, emb_size):
-        super(SelfAttention, self).__init__() # Q: when do we write super and when not
+        super(SelfAttention, self).__init__() 
         self.emb_size = emb_size
         self.linear = nn.Linear(emb_size, emb_size)
     
@@ -83,7 +75,7 @@ class SelfAttention(nn.Module):
         q, k, v = self.linear(q), self.linear(k), self.linear(v)
         # 2. Matrix Multiplication (Q*K)
         # shape: bsz, seq_len, seq_len
-        qk = torch.matmul(q, k.transpose(-2, -1)) # Q: (maybe through debugging) why transpose? => for consistent multiplication; k.trans shape: (bsz, emb, seq_len)
+        qk = torch.matmul(q, k.transpose(-2, -1)) 
         # 3. Scaling
         qk_scale = qk / math.sqrt(self.emb_size) 
         # 4. Ignore padding (not attend to them)
@@ -91,7 +83,7 @@ class SelfAttention(nn.Module):
             # BUG: from here starts the bug; as for 3rd sentence: all false "-inf" (no padding)
             qk_scale = qk_scale.masked_fill(mask==1, float('-inf')) # This was a BUG as we refer to what's padded by True (1) while mask was put to 0, thus ignoring everything
         # 5. Softmax
-        qk_soft = F.softmax(qk_scale, dim=-1) # shape: bs, emb, emb, Q: (maybe debugging) what is the dim we seek in softmax? (over emb/seq?)
+        qk_soft = F.softmax(qk_scale, dim=-1) # shape: bs, emb, emb
         # 6. Multiply by Value
         qkv = torch.matmul(qk_soft, v) # shape: bsz, seq_len, emb_size
 
@@ -130,9 +122,8 @@ class EncoderLayer(nn.Module):
         )
 
     def forward(self, x, atten_pad_mask):
-        # Q: is it best practice to adjust inplace (make all of them "x")
         # 1. Attention
-        attention = self.multi_head_attention(x, atten_pad_mask) # Q: add dropout or not? (found in previous imp)
+        attention = self.multi_head_attention(x, atten_pad_mask) 
         # 2. Add & Norm
         x_atten_and_norm = self.norm((attention + x))
         # 3. FeedForward
@@ -144,7 +135,7 @@ class EncoderLayer(nn.Module):
 class Encoder(nn.Module):
     def __init__(self, n_layers, *layer_args):
         super(Encoder, self).__init__()
-        self.encoder_layers = nn.ModuleList([EncoderLayer(*layer_args) for _ in range(n_layers)]) # Solved Question: when to use nn.Module and nn.ModuleList; Module: if one layer/ ModuleList if range of layers
+        self.encoder_layers = nn.ModuleList([EncoderLayer(*layer_args) for _ in range(n_layers)]) 
 
     def forward(self, x, atten_pad_mask): 
         for encoder_layer in self.encoder_layers:
@@ -158,7 +149,7 @@ class BERTModel(nn.Module):
     def __init__(self, vocab_size, emb_size, n_layers, n_heads, dense_dim, dropout_rate, max_relative_position=10):
         super(BERTModel, self).__init__()
         self.embedding = BERTEmbedding(vocab_size, emb_size, n_heads, max_relative_position, dropout_rate, device)
-        self.encoder = Encoder(n_layers, n_heads, emb_size, dense_dim, dropout_rate) # Solved Question: why is the blog making it different? since they're making one layer
+        self.encoder = Encoder(n_layers, n_heads, emb_size, dense_dim, dropout_rate) 
         self.mask_prediction_layer = nn.Linear(emb_size, vocab_size) # we want to project over the vocab space
         # As we won't use CCE then we need to explicitly make softmax
         self.softmax = nn.LogSoftmax(dim=-1)
@@ -169,7 +160,7 @@ class BERTModel(nn.Module):
         encoding = self.encoder(embedding, atten_pad_mask)
         mask_prediction = self.mask_prediction_layer(encoding) # This serves as logits
 
-        first_word = encoding[:, 0, :] # Important Q: why is that??
+        first_word = encoding[:, 0, :] 
         nsp_prediction = self.nsp_prediction_layer(first_word) # This isn't 0-1 but floats  + and - 
 
         return self.softmax(mask_prediction), nsp_prediction
